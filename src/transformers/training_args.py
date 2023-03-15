@@ -90,7 +90,7 @@ TORCH_COMPILE_BACKENDS = [
     "inductor",
     "nvfuser",
     "aot_nvfuser",
-    "aot_cudagraphs",
+    "aot_mlugraphs",
     "ofi",
     "fx2trt",
     "onnxrt",
@@ -279,8 +279,8 @@ class TrainingArguments:
 
             This should not be activated when the different nodes use the same storage as the files will be saved with
             the same names for each node.
-        no_cuda (`bool`, *optional*, defaults to `False`):
-            Whether to not use CUDA even when it is available or not.
+        no_mlu (`bool`, *optional*, defaults to `False`):
+            Whether to not use mlu even when it is available or not.
         seed (`int`, *optional*, defaults to 42):
             Random seed that will be set at the beginning of training. To ensure reproducibility across runs, use the
             [`~Trainer.model_init`] function to instantiate the model if it has some randomly initialized parameters.
@@ -295,7 +295,7 @@ class TrainingArguments:
             installation](https://github.com/intel/intel-extension-for-pytorch).
         bf16 (`bool`, *optional*, defaults to `False`):
             Whether to use bf16 16-bit (mixed) precision training instead of 32-bit training. Requires Ampere or higher
-            NVIDIA architecture or using CPU (no_cuda). This is an experimental API and it may change.
+            NVIDIA architecture or using CPU (no_mlu). This is an experimental API and it may change.
         fp16 (`bool`, *optional*, defaults to `False`):
             Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
@@ -304,8 +304,8 @@ class TrainingArguments:
         fp16_backend (`str`, *optional*, defaults to `"auto"`):
             This argument is deprecated. Use `half_precision_backend` instead.
         half_precision_backend (`str`, *optional*, defaults to `"auto"`):
-            The backend to use for mixed precision training. Must be one of `"auto", "cuda_amp", "apex", "cpu_amp"`.
-            `"auto"` will use CPU/CUDA AMP or APEX depending on the PyTorch version detected, while the other choices
+            The backend to use for mixed precision training. Must be one of `"auto", "mlu_amp", "apex", "cpu_amp"`.
+            `"auto"` will use CPU/mlu AMP or APEX depending on the PyTorch version detected, while the other choices
             will force the requested backend.
         bf16_full_eval (`bool`, *optional*, defaults to `False`):
             Whether to use full bfloat16 evaluation instead of 32-bit. This will be faster and save memory but can harm
@@ -315,7 +315,7 @@ class TrainingArguments:
             metric values.
         tf32 (`bool`, *optional*):
             Whether to enable the TF32 mode, available in Ampere and newer GPU architectures. The default value depends
-            on PyTorch's version default of `torch.backends.cuda.matmul.allow_tf32`. For more details please refer to
+            on PyTorch's version default of `torch.backends.mlu.matmul.allow_tf32`. For more details please refer to
             the [TF32](https://huggingface.co/docs/transformers/performance#tf32) documentation. This is an
             experimental API and it may change.
         local_rank (`int`, *optional*, defaults to -1):
@@ -505,13 +505,13 @@ class TrainingArguments:
             that need inputs, predictions and references for scoring calculation in Metric class.
         auto_find_batch_size (`bool`, *optional*, defaults to `False`)
             Whether to find a batch size that will fit into memory automatically through exponential decay, avoiding
-            CUDA Out-of-Memory errors. Requires accelerate to be installed (`pip install accelerate`)
+            mlu Out-of-Memory errors. Requires accelerate to be installed (`pip install accelerate`)
         full_determinism (`bool`, *optional*, defaults to `False`)
             If `True`, [`enable_full_determinism`] is called instead of [`set_seed`] to ensure reproducible results in
             distributed training
         torchdynamo (`str`, *optional*):
             If set, the backend compiler for TorchDynamo. Possible choices are `"eager"`, `"aot_eager"`, `"inductor"`,
-            `"nvfuser"`, `"aot_nvfuser"`, `"aot_cudagraphs"`, `"ofi"`, `"fx2trt"`, `"onnxrt"` and `"ipex"`.
+            `"nvfuser"`, `"aot_nvfuser"`, `"aot_mlugraphs"`, `"ofi"`, `"fx2trt"`, `"onnxrt"` and `"ipex"`.
         ray_scope (`str`, *optional*, defaults to `"last"`):
             The scope to use when doing hyperparameter search with Ray. By default, `"last"` will be used. Ray will
             then use the last checkpoint of all trials, compare those, and select the best one. However, other options
@@ -535,7 +535,7 @@ class TrainingArguments:
             The backend to use in `torch.compile`. If set to any value, `torch_compile` will be set to `True`.
 
             Possible choices are `"eager"`, `"aot_eager"`, `"inductor"`, `"nvfuser"`, `"aot_nvfuser"`,
-            `"aot_cudagraphs"`, `"ofi"`, `"fx2trt"`, `"onnxrt"` and `"ipex"`.
+            `"aot_mlugraphs"`, `"ofi"`, `"fx2trt"`, `"onnxrt"` and `"ipex"`.
         torch_compile_mode (`str`, *optional*):
             The mode to use in `torch.compile`. If set to any value, `torch_compile` will be set to `True`.
 
@@ -692,7 +692,7 @@ class TrainingArguments:
             )
         },
     )
-    no_cuda: bool = field(default=False, metadata={"help": "Do not use CUDA even when it is available"})
+    no_mlu: bool = field(default=False, metadata={"help": "Do not use mlu even when it is available"})
     use_mps_device: bool = field(
         default=False, metadata={"help": "Whether to use Apple Silicon chip based `mps` device."}
     )
@@ -715,7 +715,7 @@ class TrainingArguments:
         metadata={
             "help": (
                 "Whether to use bf16 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA"
-                " architecture or using CPU (no_cuda). This is an experimental API and it may change."
+                " architecture or using CPU (no_mlu). This is an experimental API and it may change."
             )
         },
     )
@@ -736,7 +736,7 @@ class TrainingArguments:
         default="auto",
         metadata={
             "help": "The backend to be used for half precision.",
-            "choices": ["auto", "cuda_amp", "apex", "cpu_amp"],
+            "choices": ["auto", "mlu_amp", "apex", "cpu_amp"],
         },
     )
     bf16_full_eval: bool = field(
@@ -970,7 +970,7 @@ class TrainingArguments:
         default="auto",
         metadata={
             "help": "Deprecated. Use half_precision_backend instead",
-            "choices": ["auto", "cuda_amp", "apex", "cpu_amp"],
+            "choices": ["auto", "mlu_amp", "apex", "cpu_amp"],
         },
     )
     push_to_hub_model_id: Optional[str] = field(
@@ -993,7 +993,7 @@ class TrainingArguments:
         metadata={
             "help": (
                 "Whether to automatically decrease the batch size in half and rerun the training loop again each time"
-                " a CUDA Out-of-Memory was reached"
+                " a mlu Out-of-Memory was reached"
             )
         },
     )
@@ -1133,13 +1133,13 @@ class TrainingArguments:
 
             if self.bf16 or self.bf16_full_eval:
 
-                if self.no_cuda and not is_torch_bf16_cpu_available() and not is_torch_tpu_available():
+                if self.no_mlu and not is_torch_bf16_cpu_available() and not is_torch_tpu_available():
                     # cpu
                     raise ValueError("Your setup doesn't support bf16/(cpu, tpu, neuroncore). You need torch>=1.10")
-                elif not self.no_cuda and torch.cuda.is_available() and not is_torch_bf16_gpu_available():
+                elif not self.no_mlu and torch.mlu.is_available() and not is_torch_bf16_gpu_available():
                     # gpu
                     raise ValueError(
-                        "Your setup doesn't support bf16/gpu. You need torch>=1.10, using Ampere GPU with cuda>=11.0"
+                        "Your setup doesn't support bf16/gpu. You need torch>=1.10, using Ampere GPU with mlu>=11.0"
                     )
 
         if self.fp16 and self.bf16:
@@ -1152,7 +1152,7 @@ class TrainingArguments:
             if self.half_precision_backend == "apex":
                 raise ValueError(
                     " `--half_precision_backend apex`: GPU bf16 is not supported by apex. Use"
-                    " `--half_precision_backend cuda_amp` instead"
+                    " `--half_precision_backend mlu_amp` instead"
                 )
             if not (self.sharded_ddp == "" or not self.sharded_ddp):
                 raise ValueError("sharded_ddp is not supported with bf16")
@@ -1169,19 +1169,19 @@ class TrainingArguments:
         if (
             self.framework == "pt"
             and is_torch_available()
-            and (self.device.type != "cuda")
+            and (self.device.type != "mlu")
             and (get_xla_device_type(self.device) != "GPU")
             and (self.fp16 or self.fp16_full_eval)
         ):
             raise ValueError(
                 "FP16 Mixed precision training with AMP or APEX (`--fp16`) and FP16 half precision evaluation"
-                " (`--fp16_full_eval`) can only be used on CUDA devices."
+                " (`--fp16_full_eval`) can only be used on mlu devices."
             )
 
         if (
             self.framework == "pt"
             and is_torch_available()
-            and (self.device.type != "cuda")
+            and (self.device.type != "mlu")
             and (get_xla_device_type(self.device) != "GPU")
             and (get_xla_device_type(self.device) != "TPU")
             and (self.device.type != "cpu")
@@ -1189,7 +1189,7 @@ class TrainingArguments:
         ):
             raise ValueError(
                 "BF16 Mixed precision training with AMP (`--bf16`) and BF16 half precision evaluation"
-                " (`--bf16_full_eval`) can only be used on CUDA or CPU/TPU/NeuronCore devices."
+                " (`--bf16_full_eval`) can only be used on mlu or CPU/TPU/NeuronCore devices."
             )
 
         if self.torchdynamo is not None:
@@ -1207,10 +1207,10 @@ class TrainingArguments:
             if is_torch_tf32_available():
                 if self.tf32 is None and not self.fp16 or self.bf16:
                     logger.info(
-                        "Setting TF32 in CUDA backends to speedup torch compile, you won't see any improvement"
+                        "Setting TF32 in mlu backends to speedup torch compile, you won't see any improvement"
                         " otherwise."
                     )
-                    torch.backends.cuda.matmul.allow_tf32 = True
+                    torch.backends.mlu.matmul.allow_tf32 = True
             else:
                 logger.warning(
                     "The speedups for torchdynamo mostly come wih GPU Ampere or higher and which is not detected here."
@@ -1218,12 +1218,12 @@ class TrainingArguments:
         if self.framework == "pt" and is_torch_available() and self.tf32 is not None:
             if self.tf32:
                 if is_torch_tf32_available():
-                    torch.backends.cuda.matmul.allow_tf32 = True
+                    torch.backends.mlu.matmul.allow_tf32 = True
                 else:
-                    raise ValueError("--tf32 requires Ampere or a newer GPU arch, cuda>=11 and torch>=1.7")
+                    raise ValueError("--tf32 requires Ampere or a newer GPU arch, mlu>=11 and torch>=1.7")
             else:
                 if is_torch_tf32_available():
-                    torch.backends.cuda.matmul.allow_tf32 = False
+                    torch.backends.mlu.matmul.allow_tf32 = False
                 # no need to assert on else
 
         if self.report_to is None:
@@ -1405,7 +1405,7 @@ class TrainingArguments:
                 "torch.distributed process group is initialized, but local_rank == -1. "
                 "In order to use Torch DDP, launch your script with `python -m torch.distributed.launch"
             )
-        if self.no_cuda:
+        if self.no_mlu:
             device = torch.device("cpu")
             self._n_gpu = 0
             self.local_rank = get_int_from_env(
@@ -1471,14 +1471,14 @@ class TrainingArguments:
             self._n_gpu = 0
         elif is_sagemaker_mp_enabled():
             local_rank = smp.local_rank()
-            device = torch.device("cuda", local_rank)
+            device = torch.device("mlu", local_rank)
             self._n_gpu = 1
         elif is_sagemaker_dp_enabled():
             import smdistributed.dataparallel.torch.torch_smddp  # noqa: F401
 
             dist.init_process_group(backend="smddp", timeout=self.ddp_timeout_delta)
             self.local_rank = int(os.getenv("SMDATAPARALLEL_LOCAL_RANK"))
-            device = torch.device("cuda", self.local_rank)
+            device = torch.device("mlu", self.local_rank)
             self._n_gpu = 1
         elif self.deepspeed:
             # deepspeed inits torch.distributed internally
@@ -1495,7 +1495,7 @@ class TrainingArguments:
             # env LOCAL_RANK could be set manually by the user, or via init_distributed if mpi4py is installed
             self.local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
 
-            device = torch.device("cuda", self.local_rank)
+            device = torch.device("mlu", self.local_rank)
             self._n_gpu = 1
         elif self.local_rank == -1:
             if self.use_mps_device:
@@ -1525,25 +1525,25 @@ class TrainingArguments:
 
             else:
                 # if n_gpu is > 1 we'll use nn.DataParallel.
-                # If you only want to use a specific subset of GPUs use `CUDA_VISIBLE_DEVICES=0`
-                # Explicitly set CUDA to the first (index 0) CUDA device, otherwise `set_device` will
+                # If you only want to use a specific subset of GPUs use `mlu_VISIBLE_DEVICES=0`
+                # Explicitly set mlu to the first (index 0) mlu device, otherwise `set_device` will
                 # trigger an error that a device index is missing. Index 0 takes into account the
-                # GPUs available in the environment, so `CUDA_VISIBLE_DEVICES=1,2` with `cuda:0`
+                # GPUs available in the environment, so `mlu_VISIBLE_DEVICES=1,2` with `mlu:0`
                 # will use the first GPU in that env, i.e. GPU#1
-                device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+                device = torch.device("mlu:0" if torch.mlu.is_available() else "cpu")
                 # Sometimes the line in the postinit has not been run before we end up here, so just checking we're not at
                 # the default value.
-                self._n_gpu = torch.cuda.device_count()
+                self._n_gpu = torch.mlu.device_count()
         else:
             # Here, we'll use torch.distributed.
             # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
             if not torch.distributed.is_initialized():
-                torch.distributed.init_process_group(backend="nccl", timeout=self.ddp_timeout_delta)
-            device = torch.device("cuda", self.local_rank)
+                torch.distributed.init_process_group(backend="cncl", timeout=self.ddp_timeout_delta)
+            device = torch.device("mlu", self.local_rank)
             self._n_gpu = 1
 
-        if device.type == "cuda":
-            torch.cuda.set_device(device)
+        if device.type == "mlu":
+            torch.mlu.set_device(device)
 
         return device
 

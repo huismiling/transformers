@@ -418,7 +418,7 @@ class Trainer:
                 self.fsdp = ShardingStrategy.NO_SHARD
 
         # one place to sort out whether to place the model on device or not
-        # postpone switching model to cuda when:
+        # postpone switching model to mlu when:
         # 1. MP - since we are trying to fit a much bigger than 1 gpu model
         # 2. fp16-enabled DeepSpeed loads the model in half the size and it doesn't need .to() anyway,
         #    and we only use deepspeed for training at the moment
@@ -524,7 +524,7 @@ class Trainer:
 
         # Mixed precision setup
         self.use_apex = False
-        self.use_cuda_amp = False
+        self.use_mlu_amp = False
         self.use_cpu_amp = False
 
         # Mixed precision setup for SageMaker Model Parallel
@@ -560,15 +560,15 @@ class Trainer:
                     else:
                         raise ValueError("Tried to use cpu amp but native cpu amp is not available")
                 else:
-                    args.half_precision_backend = "cuda_amp"
+                    args.half_precision_backend = "mlu_amp"
 
             logger.info(f"Using {args.half_precision_backend} half precision backend")
 
         self.do_grad_scaling = False
         if (args.fp16 or args.bf16) and not (args.deepspeed or is_sagemaker_mp_enabled() or is_torch_tpu_available()):
             # deepspeed and SageMaker Model Parallel manage their own half precision
-            if args.half_precision_backend == "cuda_amp":
-                self.use_cuda_amp = True
+            if args.half_precision_backend == "mlu_amp":
+                self.use_mlu_amp = True
                 self.amp_dtype = torch.float16 if args.fp16 else torch.bfloat16
                 self.do_grad_scaling = True
                 if self.sharded_ddp is not None:
@@ -582,7 +582,7 @@ class Trainer:
                         self.scaler = FSDPShardedGradScaler()
                     else:
                         self.do_grad_scaling = False
-                        self.use_cuda_amp = False
+                        self.use_mlu_amp = False
                         self.amp_dtype = None
 
                 elif is_torch_tpu_available():
@@ -590,7 +590,7 @@ class Trainer:
 
                     self.scaler = GradScaler()
                 else:
-                    self.scaler = torch.cuda.amp.GradScaler()
+                    self.scaler = torch.mlu.amp.GradScaler()
             elif args.half_precision_backend == "cpu_amp":
                 self.use_cpu_amp = True
                 self.amp_dtype = torch.bfloat16
@@ -605,7 +605,7 @@ class Trainer:
         # FP16 + model parallelism in SageMaker: gradient clipping does not work for now so we raise a helpful error.
         if (
             is_sagemaker_mp_enabled()
-            and self.use_cuda_amp
+            and self.use_mlu_amp
             and args.max_grad_norm is not None
             and args.max_grad_norm > 0
         ):
@@ -1300,7 +1300,7 @@ class Trainer:
                     jit_model(**example_batch)
                 model = jit_model
                 self.use_cpu_amp = False
-                self.use_cuda_amp = False
+                self.use_mlu_amp = False
             except (RuntimeError, TypeError, ValueError, NameError, IndexError) as e:
                 logger.warning(f"failed to use PyTorch jit mode due to: {e}.")
 
@@ -2162,12 +2162,12 @@ class Trainer:
         random.setstate(checkpoint_rng_state["python"])
         np.random.set_state(checkpoint_rng_state["numpy"])
         torch.random.set_rng_state(checkpoint_rng_state["cpu"])
-        if torch.cuda.is_available():
+        if torch.mlu.is_available():
             if self.args.local_rank != -1:
-                torch.cuda.random.set_rng_state(checkpoint_rng_state["cuda"])
+                torch.mlu.set_rng_state(checkpoint_rng_state["mlu"])
             else:
                 try:
-                    torch.cuda.random.set_rng_state_all(checkpoint_rng_state["cuda"])
+                    torch.mlu.set_rng_state_all(checkpoint_rng_state["mlu"])
                 except Exception as e:
                     logger.info(
                         f"Didn't manage to set back the RNG states of the GPU because of the following error:\n {e}"
@@ -2256,12 +2256,12 @@ class Trainer:
             "numpy": np.random.get_state(),
             "cpu": torch.random.get_rng_state(),
         }
-        if torch.cuda.is_available():
+        if torch.mlu.is_available():
             if self.args.local_rank == -1:
-                # In non distributed, we save the global CUDA RNG state (will take care of DataParallel)
-                rng_states["cuda"] = torch.cuda.random.get_rng_state_all()
+                # In non distributed, we save the global mlu RNG state (will take care of DataParallel)
+                rng_states["mlu"] = torch.mlu.get_rng_state_all()
             else:
-                rng_states["cuda"] = torch.cuda.random.get_rng_state()
+                rng_states["mlu"] = torch.mlu.get_rng_state()
 
         if is_torch_tpu_available():
             rng_states["xla"] = xm.get_rng_state()
@@ -2496,15 +2496,15 @@ class Trainer:
         A helper wrapper that creates an appropriate context manager for `autocast` while feeding it the desired
         arguments, depending on the situation.
         """
-        if self.use_cuda_amp or self.use_cpu_amp:
+        if self.use_mlu_amp or self.use_cpu_amp:
             if is_torch_greater_or_equal_than_1_10:
                 ctx_manager = (
                     torch.cpu.amp.autocast(cache_enabled=cache_enabled, dtype=self.amp_dtype)
                     if self.use_cpu_amp
-                    else torch.cuda.amp.autocast(cache_enabled=cache_enabled, dtype=self.amp_dtype)
+                    else torch.mlu.amp.autocast(cache_enabled=cache_enabled, dtype=self.amp_dtype)
                 )
             else:
-                ctx_manager = torch.cuda.amp.autocast()
+                ctx_manager = torch.mlu.amp.autocast()
         else:
             ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
 

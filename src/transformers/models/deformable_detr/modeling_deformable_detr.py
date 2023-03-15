@@ -34,7 +34,7 @@ from ...file_utils import (
     add_start_docstrings_to_model_forward,
     is_scipy_available,
     is_timm_available,
-    is_torch_cuda_available,
+    is_torch_mlu_available,
     is_vision_available,
     replace_return_docstrings,
     requires_backends,

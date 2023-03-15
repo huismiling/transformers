@@ -296,16 +296,17 @@ def is_librosa_available():
     return _librosa_available
 
 
-def is_torch_cuda_available():
+def is_torch_mlu_available():
     if is_torch_available():
         import torch
 
-        return torch.cuda.is_available()
+        return torch.mlu.is_available()
     else:
         return False
 
 
 def is_torch_bf16_gpu_available():
+    return False
     if not is_torch_available():
         return False
 
@@ -367,6 +368,7 @@ def is_torch_bf16_available():
 
 
 def is_torch_tf32_available():
+    return False
     if not is_torch_available():
         return False
 
