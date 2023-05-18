@@ -80,9 +80,6 @@ class DeformableDetrConfig(PretrainedConfig):
         encoder_layerdrop: (`float`, *optional*, defaults to 0.0):
             The LayerDrop probability for the encoder. See the [LayerDrop paper](see https://arxiv.org/abs/1909.11556)
             for more details.
-        decoder_layerdrop: (`float`, *optional*, defaults to 0.0):
-            The LayerDrop probability for the decoder. See the [LayerDrop paper](see https://arxiv.org/abs/1909.11556)
-            for more details.
         auxiliary_loss (`bool`, *optional*, defaults to `False`):
             Whether auxiliary decoding losses (loss at each decoder layer) are to be used.
         position_embedding_type (`str`, *optional*, defaults to `"sine"`):
@@ -128,6 +125,9 @@ class DeformableDetrConfig(PretrainedConfig):
             based on the predictions from the previous layer.
         focal_alpha (`float`, *optional*, defaults to 0.25):
             Alpha parameter in the focal loss.
+        disable_custom_kernels (`bool`, *optional*, defaults to `False`):
+            Disable the use of custom CUDA and CPU kernels. This option is necessary for the ONNX export, as custom
+            kernels are not supported by PyTorch ONNX export.
 
     Examples:
 
@@ -163,7 +163,6 @@ class DeformableDetrConfig(PretrainedConfig):
         decoder_ffn_dim=1024,
         decoder_attention_heads=8,
         encoder_layerdrop=0.0,
-        decoder_layerdrop=0.0,
         is_encoder_decoder=True,
         activation_function="relu",
         d_model=256,
@@ -193,7 +192,8 @@ class DeformableDetrConfig(PretrainedConfig):
         giou_loss_coefficient=2,
         eos_coefficient=0.1,
         focal_alpha=0.25,
-        **kwargs
+        disable_custom_kernels=False,
+        **kwargs,
     ):
         if backbone_config is not None and use_timm_backbone:
             raise ValueError("You can't specify both `backbone_config` and `use_timm_backbone`.")
@@ -225,7 +225,6 @@ class DeformableDetrConfig(PretrainedConfig):
         self.init_std = init_std
         self.init_xavier_std = init_xavier_std
         self.encoder_layerdrop = encoder_layerdrop
-        self.decoder_layerdrop = decoder_layerdrop
         self.auxiliary_loss = auxiliary_loss
         self.position_embedding_type = position_embedding_type
         self.backbone = backbone
@@ -251,6 +250,7 @@ class DeformableDetrConfig(PretrainedConfig):
         self.giou_loss_coefficient = giou_loss_coefficient
         self.eos_coefficient = eos_coefficient
         self.focal_alpha = focal_alpha
+        self.disable_custom_kernels = disable_custom_kernels
         super().__init__(is_encoder_decoder=is_encoder_decoder, **kwargs)
 
     @property

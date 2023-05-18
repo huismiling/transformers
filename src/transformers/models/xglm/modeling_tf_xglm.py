@@ -42,7 +42,7 @@ from ...modeling_tf_utils import (
     keras_serializable,
     unpack_inputs,
 )
-from ...tf_utils import shape_list, stable_softmax
+from ...tf_utils import check_embeddings_within_bounds, shape_list, stable_softmax
 from ...utils import logging
 from .configuration_xglm import XGLMConfig
 
@@ -476,19 +476,8 @@ class TFXGLMMainLayer(tf.keras.layers.Layer):
 
         return combined_attention_mask
 
-    def embed_positions(
-        self,
-        input_ids: Optional[TFModelInputType] = None,
-        inputs_embeds: Optional[Union[np.ndarray, tf.Tensor]] = None,
-        past_key_values_length: Optional[int] = None,
-    ) -> tf.Tensor:
-        if input_ids is not None:
-            position_ids = _create_position_ids_from_input_ids(input_ids, past_key_values_length, self.padding_idx)
-        else:
-            position_ids = _create_position_ids_from_inputs_embeds(
-                inputs_embeds, past_key_values_length, self.padding_idx
-            )
-
+    def embed_positions(self, position_ids: Optional[Union[np.ndarray, tf.Tensor]] = None) -> tf.Tensor:
+        position_ids += self.offset
         positions = tf.gather(self._embed_positions_weights, position_ids, axis=0)
         return positions
 
@@ -497,6 +486,7 @@ class TFXGLMMainLayer(tf.keras.layers.Layer):
         self,
         input_ids: Optional[TFModelInputType] = None,
         attention_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
+        position_ids: Optional[Union[np.ndarray, tf.Tensor]] = None,
         encoder_hidden_states: Optional[Union[np.ndarray, tf.Tensor]] = None,
         encoder_attention_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
         head_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
@@ -528,20 +518,16 @@ class TFXGLMMainLayer(tf.keras.layers.Layer):
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # past_key_values_length
         past_key_values_length = past_key_values[0][0].shape[2] if past_key_values is not None else 0
 
-        if inputs_embeds is None:
-            # Note: tf.gather, on which the embedding layer is based, won't check positive out of bound
-            # indices on GPU, returning zeros instead. This is a dangerous silent behavior.
-            tf.debugging.assert_less(
-                input_ids,
-                tf.cast(self.embed_tokens.vocab_size, dtype=input_ids.dtype),
-                message=(
-                    "input_ids must be smaller than the embedding layer's input dimension (got"
-                    f" {tf.math.reduce_max(input_ids)} >= {self.embed_tokens.vocab_size})"
-                ),
+        if position_ids is None:
+            position_ids = tf.expand_dims(
+                tf.range(past_key_values_length, input_shape[-1] + past_key_values_length), axis=0
             )
+        position_ids = tf.reshape(position_ids, [-1, shape_list(position_ids)[-1]])
+
+        if inputs_embeds is None:
+            check_embeddings_within_bounds(input_ids, self.embed_tokens.vocab_size)
             inputs_embeds = self.embed_tokens(input_ids) * self.embed_scale
 
         attention_mask = self._prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length)
@@ -552,7 +538,7 @@ class TFXGLMMainLayer(tf.keras.layers.Layer):
             encoder_attention_mask = _expand_mask(encoder_attention_mask, tgt_len=input_shape[-1])
 
         # embed positions
-        positions = self.embed_positions(input_ids, inputs_embeds, past_key_values_length)
+        positions = self.embed_positions(position_ids)
 
         hidden_states = tf.cast(inputs_embeds, dtype=tf.float32) + positions
 
@@ -713,6 +699,11 @@ XGLM_INPUTS_DOCSTRING = r"""
             - 0 for tokens that are **masked**.
 
             [What are attention masks?](../glossary#attention-mask)
+        position_ids (`tf.Tensor` or `Numpy array` of shape `(batch_size, sequence_length)`, *optional*):
+            Indices of positions of each input sequence tokens in the position embeddings. Selected in the range `[0,
+            config.max_position_embeddings - 1]`.
+
+            [What are position IDs?](../glossary#position-ids)
         encoder_hidden_states (`tf.Tensor` of shape `(batch_size, encoder_sequence_length, hidden_size)`, *optional*):
             Sequence of hidden-states at the output of the last layer of the encoder. Used in the cross-attention of
             the decoder.
@@ -796,6 +787,7 @@ class TFXGLMModel(TFXGLMPreTrainedModel):
         self,
         input_ids: Optional[TFModelInputType] = None,
         attention_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
+        position_ids: Optional[Union[np.ndarray, tf.Tensor]] = None,
         encoder_hidden_states: Optional[Union[np.ndarray, tf.Tensor]] = None,
         encoder_attention_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
         head_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
@@ -809,7 +801,6 @@ class TFXGLMModel(TFXGLMPreTrainedModel):
         training: Optional[bool] = False,
         **kwargs: Any,
     ) -> Union[TFBaseModelOutputWithPastAndCrossAttentions, Tuple[tf.Tensor]]:
-
         outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -877,9 +868,6 @@ class TFXGLMForCausalLM(TFXGLMPreTrainedModel, TFCausalLanguageModelingLoss):
             name="lm_head",
         )
 
-        # TODO (Joao): investigate why XGLM has numerical issues in XLA generate
-        self.supports_xla_generation = False
-
     def get_output_embeddings(self):
         return self.lm_head
 
@@ -891,11 +879,18 @@ class TFXGLMForCausalLM(TFXGLMPreTrainedModel, TFCausalLanguageModelingLoss):
         if past_key_values:
             inputs = tf.expand_dims(inputs[:, -1], -1)
 
+        position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
+
+        if attention_mask is not None and position_ids is None:
+            position_ids = tf.math.cumsum(attention_mask, axis=-1, exclusive=True)
+            if past_key_values:
+                position_ids = tf.expand_dims(position_ids[:, -1], -1)
 
         return {
             "input_ids": inputs,
             "attention_mask": attention_mask,
+            "position_ids": position_ids,
             "past_key_values": past_key_values,
             "use_cache": use_cache,
         }
@@ -912,6 +907,7 @@ class TFXGLMForCausalLM(TFXGLMPreTrainedModel, TFCausalLanguageModelingLoss):
         self,
         input_ids: Optional[TFModelInputType] = None,
         attention_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
+        position_ids: Optional[Union[np.ndarray, tf.Tensor]] = None,
         encoder_hidden_states: Optional[Union[np.ndarray, tf.Tensor]] = None,
         encoder_attention_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
         head_mask: Optional[Union[np.ndarray, tf.Tensor]] = None,
@@ -936,6 +932,7 @@ class TFXGLMForCausalLM(TFXGLMPreTrainedModel, TFCausalLanguageModelingLoss):
         outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
             head_mask=head_mask,
@@ -954,9 +951,11 @@ class TFXGLMForCausalLM(TFXGLMPreTrainedModel, TFCausalLanguageModelingLoss):
         loss = None
         if labels is not None:
             # shift labels to the left and cut last logit token
-            shifted_logits = lm_logits[:, :-1]
-            labels = labels[:, 1:]
-            loss = self.hf_compute_loss(labels, shifted_logits)
+            labels = tf.concat(
+                [labels[:, 1:], tf.fill((labels.shape[0], 1), tf.cast(self.config.pad_token_id, labels.dtype))],
+                axis=-1,
+            )
+            loss = self.hf_compute_loss(labels, lm_logits)
 
         if not return_dict:
             output = (lm_logits,) + outputs[1:]
