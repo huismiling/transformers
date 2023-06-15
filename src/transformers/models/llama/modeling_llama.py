@@ -567,13 +567,16 @@ class LlamaModel(LlamaPreTrainedModel):
 
                     return custom_forward
 
-                layer_outputs = torch.utils.checkpoint.checkpoint(
+                from deepspeed.runtime.activation_checkpointing.checkpointing import checkpoint
+                layer_outputs = checkpoint(
                     create_custom_forward(decoder_layer),
                     hidden_states,
                     attention_mask,
                     position_ids,
                     None,
                 )
+                if not isinstance(layer_outputs, tuple):
+                    layer_outputs = tuple(layer_outputs, )
             else:
                 layer_outputs = decoder_layer(
                     hidden_states,

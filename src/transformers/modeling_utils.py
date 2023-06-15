@@ -2221,7 +2221,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
         if low_cpu_mem_usage:
             if device_map is not None:
                 # The max memory utils require PyTorch >= 1.10 to have torch.cuda.mem_get_info.
-                require_version_core("torch>=1.10")
+                require_version_core("torch>=1.9")
 
             if is_deepspeed_zero3_enabled():
                 raise ValueError(

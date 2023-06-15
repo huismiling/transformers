@@ -34,7 +34,7 @@ from .utils import (
     is_psutil_available,
     is_tf_available,
     is_torch_available,
-    is_torch_cuda_available,
+    is_torch_mlu_available,
     is_torch_tpu_available,
     requires_backends,
 )
@@ -91,8 +91,8 @@ def set_seed(seed: int):
     np.random.seed(seed)
     if is_torch_available():
         torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        # ^^ safe to call this function even if cuda is not available
+        torch.mlu.manual_seed_all(seed)
+        # ^^ safe to call this function even if mlu is not available
     if is_tf_available():
         tf.random.set_seed(seed)
 
@@ -416,7 +416,7 @@ class TrainerMemoryTracker:
 
         import psutil  # noqa
 
-        if is_torch_cuda_available():
+        if is_torch_mlu_available():
             import torch
 
             self.torch = torch
@@ -471,12 +471,12 @@ class TrainerMemoryTracker:
         gc.collect()
 
         if self.torch is not None:
-            self.torch.cuda.reset_peak_memory_stats()
-            self.torch.cuda.empty_cache()
+            self.torch.mlu.reset_peak_memory_stats()
+            self.torch.mlu.empty_cache()
 
         # gpu
         if self.torch is not None:
-            self.gpu_mem_used_at_start = self.torch.cuda.memory_allocated()
+            self.gpu_mem_used_at_start = self.torch.mlu.memory_allocated()
 
         # cpu
         self.cpu_mem_used_at_start = self.cpu_mem_used()
@@ -500,7 +500,7 @@ class TrainerMemoryTracker:
         gc.collect()
 
         if self.torch is not None:
-            self.torch.cuda.empty_cache()
+            self.torch.mlu.empty_cache()
 
         # concepts:
         # - alloc_delta:  the difference of allocated memory between the end and the start
@@ -509,8 +509,8 @@ class TrainerMemoryTracker:
 
         # gpu
         if self.torch is not None:
-            self.gpu_mem_used_now = self.torch.cuda.memory_allocated()
-            self.gpu_mem_used_peak = self.torch.cuda.max_memory_allocated()
+            self.gpu_mem_used_now = self.torch.mlu.memory_allocated()
+            self.gpu_mem_used_peak = self.torch.mlu.max_memory_allocated()
             self.gpu[self.cur_stage] = {
                 "begin": self.gpu_mem_used_at_start,
                 "end": self.gpu_mem_used_now,

@@ -82,41 +82,41 @@ class SageMakerTrainingArguments(TrainingArguments):
                 "torch.distributed process group is initialized, but local_rank == -1. "
                 "In order to use Torch DDP, launch your script with `python -m torch.distributed.launch"
             )
-        if self.no_cuda:
+        if self.no_mlu:
             device = torch.device("cpu")
             self._n_gpu = 0
         elif is_sagemaker_model_parallel_available():
             local_rank = smp.local_rank()
-            device = torch.device("cuda", local_rank)
+            device = torch.device("mlu", local_rank)
             self._n_gpu = 1
         elif is_sagemaker_dp_enabled():
             import smdistributed.dataparallel.torch.torch_smddp  # noqa: F401
 
             torch.distributed.init_process_group(backend="smddp", timeout=self.ddp_timeout_delta)
             self.local_rank = int(os.getenv("SMDATAPARALLEL_LOCAL_RANK"))
-            device = torch.device("cuda", self.local_rank)
+            device = torch.device("mlu", self.local_rank)
             self._n_gpu = 1
         elif self.local_rank == -1:
             # if n_gpu is > 1 we'll use nn.DataParallel.
-            # If you only want to use a specific subset of GPUs use `CUDA_VISIBLE_DEVICES=0`
-            # Explicitly set CUDA to the first (index 0) CUDA device, otherwise `set_device` will
+            # If you only want to use a specific subset of GPUs use `mlu_VISIBLE_DEVICES=0`
+            # Explicitly set mlu to the first (index 0) mlu device, otherwise `set_device` will
             # trigger an error that a device index is missing. Index 0 takes into account the
-            # GPUs available in the environment, so `CUDA_VISIBLE_DEVICES=1,2` with `cuda:0`
+            # GPUs available in the environment, so `mlu_VISIBLE_DEVICES=1,2` with `mlu:0`
             # will use the first GPU in that env, i.e. GPU#1
-            device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            device = torch.device("mlu:0" if torch.mlu.is_available() else "cpu")
             # Sometimes the line in the postinit has not been run before we end up here, so just checking we're not at
             # the default value.
-            self._n_gpu = torch.cuda.device_count()
+            self._n_gpu = torch.mlu.device_count()
         else:
             # Here, we'll use torch.distributed.
             # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
             if not torch.distributed.is_initialized():
                 torch.distributed.init_process_group(backend="nccl", timeout=self.ddp_timeout_delta)
-            device = torch.device("cuda", self.local_rank)
+            device = torch.device("mlu", self.local_rank)
             self._n_gpu = 1
 
-        if device.type == "cuda":
-            torch.cuda.set_device(device)
+        if device.type == "mlu":
+            torch.mlu.set_device(device)
 
         return device
 
