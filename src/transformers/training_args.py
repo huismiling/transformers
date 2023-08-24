@@ -1737,7 +1737,7 @@ class TrainingArguments:
                         )
                     device = torch.device("mps")
                     self._n_gpu = 1
-            elif self.no_cuda:
+            elif self.no_mlu:
                 device = torch.device("cpu")
                 self._n_gpu = 0
             else:

@@ -5,6 +5,7 @@ from packaging import version
 
 from ..utils import logging
 from .import_utils import importlib_metadata, is_accelerate_available, is_bitsandbytes_available
+from .import_utils import is_torch_mlu_available
 
 
 if is_bitsandbytes_available():
@@ -67,7 +68,7 @@ def set_module_quantized_tensor_to_device(module, tensor_name, device, value=Non
 
     if is_8bit or is_4bit:
         param = module._parameters[tensor_name]
-        if param.device.type != "cuda":
+        if param.device.type != "mlu":
             if value is None:
                 new_value = old_value.to(device)
             elif isinstance(value, torch.Tensor):
