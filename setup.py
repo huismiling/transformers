@@ -147,7 +147,7 @@ _deps = [
     "pytest>=7.2.0",
     "pytest-timeout",
     "pytest-xdist",
-    "python>=3.8.0",
+    "python>=3.7.0",
     "ray[tune]",
     "regex!=2019.12.17",
     "requests",
@@ -441,7 +441,7 @@ setup(
     zip_safe=False,
     extras_require=extras,
     entry_points={"console_scripts": ["transformers-cli=transformers.commands.transformers_cli:main"]},
-    python_requires=">=3.8.0",
+    python_requires=">=3.7.0",
     install_requires=list(install_requires),
     classifiers=[
         "Development Status :: 5 - Production/Stable",
