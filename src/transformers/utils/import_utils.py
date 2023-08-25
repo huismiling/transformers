@@ -15,7 +15,15 @@
 Import utilities: Utilities related to imports and our lazy inits.
 """
 
-import importlib.metadata
+import importlib
+# The package importlib_metadata is in a different place, depending on the Python version.
+import sys
+if sys.version_info < (3, 8):
+    import importlib_metadata
+    importlib.metadata = importlib_metadata
+else:
+    import importlib.metadata as importlib_metadata
+
 import importlib.util
 import json
 import os
@@ -406,7 +414,7 @@ def is_ftfy_available():
     return _ftfy_available
 
 
-@lru_cache()
+# @lru_cache()
 def is_torch_tpu_available(check_device=True):
     "Checks if `torch_xla` is installed and potentially if a TPU is in the environment"
     if not _torch_available:
@@ -425,14 +433,14 @@ def is_torch_tpu_available(check_device=True):
     return False
 
 
-@lru_cache()
+# @lru_cache()
 def is_torch_neuroncore_available(check_device=True):
     if importlib.util.find_spec("torch_neuronx") is not None:
         return is_torch_tpu_available(check_device)
     return False
 
 
-@lru_cache()
+# @lru_cache()
 def is_torch_npu_available(check_device=False):
     "Checks if `torch_npu` is installed and potentially if a NPU is in the environment"
     if not _torch_available or importlib.util.find_spec("torch_npu") is None:
@@ -546,7 +554,7 @@ def is_bitsandbytes_available():
     # let's avoid that by adding a simple check
     import torch
 
-    return _bitsandbytes_available and torch.cuda.is_available()
+    return _bitsandbytes_available and (torch.cuda.is_available() or torch.mlu.is_available())
 
 
 def is_torchdistx_available():

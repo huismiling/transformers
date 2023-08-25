@@ -20,7 +20,14 @@ import contextlib
 import copy
 import functools
 import glob
-import importlib.metadata
+import importlib
+# The package importlib_metadata is in a different place, depending on the Python version.
+import sys
+if sys.version_info < (3, 8):
+    import importlib_metadata
+    importlib.metadata = importlib_metadata
+else:
+    import importlib.metadata as importlib_metadata
 import inspect
 import math
 import os

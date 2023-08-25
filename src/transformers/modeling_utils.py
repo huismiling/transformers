@@ -15,7 +15,14 @@
 # limitations under the License.
 import collections
 import gc
-import importlib.metadata
+import importlib
+# The package importlib_metadata is in a different place, depending on the Python version.
+import sys
+if sys.version_info < (3, 8):
+    import importlib_metadata
+    importlib.metadata = importlib_metadata
+else:
+    import importlib.metadata as importlib_metadata
 import inspect
 import json
 import os
@@ -482,7 +489,7 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
             and torch.distributed.is_initialized()
             and torch.distributed.get_rank() > 0
         ):
-            map_location = "meta"
+            map_location = "cpu"
         else:
             map_location = "cpu"
         return torch.load(checkpoint_file, map_location=map_location)

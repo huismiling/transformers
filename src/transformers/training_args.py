@@ -1248,13 +1248,13 @@ class TrainingArguments:
             )
             # Go back to the underlying string or we won't be able to instantiate `IntervalStrategy` on it.
             self.evaluation_strategy = self.evaluation_strategy.value
-        if self.no_cuda:
+        if self.no_mlu:
             warnings.warn(
-                "using `no_cuda` is deprecated and will be removed in version 5.0 of 🤗 Transformers. "
+                "using `no_mlu` is deprecated and will be removed in version 5.0 of 🤗 Transformers. "
                 "Use `use_cpu` instead",
                 FutureWarning,
             )
-            self.use_cpu = self.no_cuda
+            self.use_cpu = self.no_mlu
 
         self.evaluation_strategy = IntervalStrategy(self.evaluation_strategy)
         self.logging_strategy = IntervalStrategy(self.logging_strategy)
