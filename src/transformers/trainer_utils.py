@@ -35,6 +35,9 @@ from .utils import (
     is_tf_available,
     is_torch_available,
     is_torch_mlu_available,
+    is_torch_cuda_available,
+    is_torch_mps_available,
+    is_torch_npu_available,
     is_torch_tpu_available,
     requires_backends,
 )
@@ -55,7 +58,7 @@ def seed_worker(_):
     set_seed(worker_seed)
 
 
-def enable_full_determinism(seed: int):
+def enable_full_determinism(seed: int, warn_only: bool = False):
     """
     Helper function for reproducible behavior during distributed training. See
     - https://pytorch.org/docs/stable/notes/randomness.html for pytorch
@@ -70,7 +73,7 @@ def enable_full_determinism(seed: int):
         # depending on the CUDA version, so we set them both here
         os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":16:8"
-        torch.use_deterministic_algorithms(True)
+        torch.use_deterministic_algorithms(True, warn_only=warn_only)
 
         # Enable CUDNN deterministic mode
         torch.backends.cudnn.deterministic = True
@@ -92,7 +95,10 @@ def set_seed(seed: int):
     if is_torch_available():
         torch.manual_seed(seed)
         torch.mlu.manual_seed_all(seed)
-        # ^^ safe to call this function even if mlu is not available
+        torch.cuda.manual_seed_all(seed)
+        # ^^ safe to call this function even if cuda is not available
+    if is_torch_npu_available():
+        torch.npu.manual_seed_all(seed)
     if is_tf_available():
         tf.random.set_seed(seed)
 
@@ -301,14 +307,6 @@ class HPSearchBackend(ExplicitEnum):
     WANDB = "wandb"
 
 
-default_hp_space = {
-    HPSearchBackend.OPTUNA: default_hp_space_optuna,
-    HPSearchBackend.RAY: default_hp_space_ray,
-    HPSearchBackend.SIGOPT: default_hp_space_sigopt,
-    HPSearchBackend.WANDB: default_hp_space_wandb,
-}
-
-
 def is_main_process(local_rank):
     """
     Whether or not the current process is the local process, based on `xm.get_ordinal()` (for TPUs) first, then on
@@ -417,6 +415,11 @@ class TrainerMemoryTracker:
         import psutil  # noqa
 
         if is_torch_mlu_available():
+            import torch
+
+            self.torch = torch
+            self.gpu = {}
+        elif is_torch_mps_available():
             import torch
 
             self.torch = torch

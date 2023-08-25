@@ -15,6 +15,7 @@
 Integrations with other Python libraries.
 """
 import functools
+import importlib.metadata
 import importlib.util
 import json
 import numbers
@@ -31,7 +32,6 @@ import numpy as np
 
 from . import __version__ as version
 from .utils import flatten_dict, is_datasets_available, is_pandas_available, is_torch_available, logging
-from .utils.versions import importlib_metadata
 
 
 logger = logging.get_logger(__name__)
@@ -59,13 +59,13 @@ _has_neptune = (
 )
 if TYPE_CHECKING and _has_neptune:
     try:
-        _neptune_version = importlib_metadata.version("neptune")
+        _neptune_version = importlib.metadata.version("neptune")
         logger.info(f"Neptune version {_neptune_version} available.")
-    except importlib_metadata.PackageNotFoundError:
+    except importlib.metadata.PackageNotFoundError:
         try:
-            _neptune_version = importlib_metadata.version("neptune-client")
+            _neptune_version = importlib.metadata.version("neptune-client")
             logger.info(f"Neptune-client version {_neptune_version} available.")
-        except importlib_metadata.PackageNotFoundError:
+        except importlib.metadata.PackageNotFoundError:
             _has_neptune = False
 
 from .trainer_callback import ProgressCallback, TrainerCallback  # noqa: E402
@@ -175,15 +175,6 @@ def hp_params(trial):
             return trial
 
     raise RuntimeError(f"Unknown type for trial {trial.__class__}")
-
-
-def default_hp_search_backend():
-    if is_optuna_available():
-        return "optuna"
-    elif is_ray_tune_available():
-        return "ray"
-    elif is_sigopt_available():
-        return "sigopt"
 
 
 def run_hp_search_optuna(trainer, n_trials: int, direction: str, **kwargs) -> BestRun:
@@ -376,10 +367,8 @@ def run_hp_search_ray(trainer, n_trials: int, direction: str, **kwargs) -> BestR
 def run_hp_search_sigopt(trainer, n_trials: int, direction: str, **kwargs) -> BestRun:
     import sigopt
 
-    from transformers.utils.versions import importlib_metadata
-
     if trainer.args.process_index == 0:
-        if importlib_metadata.version("sigopt") >= "8.0.0":
+        if importlib.metadata.version("sigopt") >= "8.0.0":
             sigopt.set_project("huggingface")
 
             experiment = sigopt.create_experiment(
@@ -727,7 +716,7 @@ class WandbCallback(TrainerCallback):
             logger.info(
                 'Automatic Weights & Biases logging enabled, to disable set os.environ["WANDB_DISABLED"] = "true"'
             )
-            combined_dict = {**args.to_sanitized_dict()}
+            combined_dict = {**args.to_dict()}
 
             if hasattr(model, "config") and model.config is not None:
                 model_config = model.config.to_dict()
@@ -757,7 +746,7 @@ class WandbCallback(TrainerCallback):
             # keep track of model topology and gradients, unsupported on TPU
             _watch_model = os.getenv("WANDB_WATCH", "false")
             if not is_torch_tpu_available() and _watch_model in ("all", "parameters", "gradients"):
-                self._wandb.watch(model, log=_watch_model, log_freq=max(100, args.logging_steps))
+                self._wandb.watch(model, log=_watch_model, log_freq=max(100, state.logging_steps))
 
     def on_train_begin(self, args, state, control, model=None, **kwargs):
         if self._wandb is None:
@@ -1293,8 +1282,12 @@ class NeptuneCallback(TrainerCallback):
         self._metadata_namespace[NeptuneCallback.trainer_parameters_key] = args.to_sanitized_dict()
 
     def _log_model_parameters(self, model):
+        from neptune.utils import stringify_unsupported
+
         if model and hasattr(model, "config") and model.config is not None:
-            self._metadata_namespace[NeptuneCallback.model_parameters_key] = model.config.to_dict()
+            self._metadata_namespace[NeptuneCallback.model_parameters_key] = stringify_unsupported(
+                model.config.to_dict()
+            )
 
     def _log_hyper_param_search_parameters(self, state):
         if state and hasattr(state, "trial_name"):
