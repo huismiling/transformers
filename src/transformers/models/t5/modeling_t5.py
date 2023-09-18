@@ -231,7 +231,7 @@ DEPARALLELIZE_DOCSTRING = r"""
         3: [17, 18, 19, 20, 21, 22, 23],
     }
     model.parallelize(device_map)  # Splits the model across several devices
-    model.deparallelize()  # Put the model back on cpu and cleans memory by calling torch.cuda.empty_cache()
+    model.deparallelize()  # Put the model back on cpu and cleans memory by calling torch.mlu.empty_cache()
     ```
 """
 
@@ -936,17 +936,17 @@ class T5Stack(T5PreTrainedModel):
         )
         # Check validity of device_map
         self.device_map = (
-            get_device_map(len(self.block), range(torch.cuda.device_count())) if device_map is None else device_map
+            get_device_map(len(self.block), range(torch.mlu.device_count())) if device_map is None else device_map
         )
         assert_device_map(self.device_map, len(self.block))
         self.model_parallel = True
-        self.first_device = "cpu" if "cpu" in self.device_map.keys() else "cuda:" + str(min(self.device_map.keys()))
-        self.last_device = "cuda:" + str(max(self.device_map.keys()))
+        self.first_device = "cpu" if "cpu" in self.device_map.keys() else "mlu:" + str(min(self.device_map.keys()))
+        self.last_device = "mlu:" + str(max(self.device_map.keys()))
         # Load onto devices
         for k, v in self.device_map.items():
             for layer in v:
-                cuda_device = "cuda:" + str(k)
-                self.block[layer] = self.block[layer].to(cuda_device)
+                mlu_device = "mlu:" + str(k)
+                self.block[layer] = self.block[layer].to(mlu_device)
 
         # Set embed_tokens to first layer
         self.embed_tokens = self.embed_tokens.to(self.first_device)
@@ -967,7 +967,7 @@ class T5Stack(T5PreTrainedModel):
             self.block[i] = self.block[i].to("cpu")
         self.embed_tokens = self.embed_tokens.to("cpu")
         self.final_layer_norm = self.final_layer_norm.to("cpu")
-        torch.cuda.empty_cache()
+        torch.mlu.empty_cache()
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -992,7 +992,7 @@ class T5Stack(T5PreTrainedModel):
     ):
         # Model parallel
         if self.model_parallel:
-            torch.cuda.set_device(self.first_device)
+            torch.mlu.set_device(self.first_device)
             self.embed_tokens = self.embed_tokens.to(self.first_device)
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -1080,7 +1080,7 @@ class T5Stack(T5PreTrainedModel):
             cross_attn_layer_head_mask = cross_attn_head_mask[i]
             # Model parallel
             if self.model_parallel:
-                torch.cuda.set_device(hidden_states.device)
+                torch.mlu.set_device(hidden_states.device)
                 # Ensure that attention_mask is always on the same device as hidden_states
                 if attention_mask is not None:
                     attention_mask = attention_mask.to(hidden_states.device)
@@ -1159,8 +1159,8 @@ class T5Stack(T5PreTrainedModel):
             # Model Parallel: If it's the last layer for that device, put things on the next device
             if self.model_parallel:
                 for k, v in self.device_map.items():
-                    if i == v[-1] and "cuda:" + str(k) != self.last_device:
-                        hidden_states = hidden_states.to("cuda:" + str(k + 1))
+                    if i == v[-1] and "mlu:" + str(k) != self.last_device:
+                        hidden_states = hidden_states.to("mlu:" + str(k + 1))
 
         hidden_states = self.final_layer_norm(hidden_states)
         hidden_states = self.dropout(hidden_states)
@@ -1393,7 +1393,7 @@ class T5Model(T5PreTrainedModel):
             FutureWarning,
         )
         self.device_map = (
-            get_device_map(len(self.encoder.block), range(torch.cuda.device_count()))
+            get_device_map(len(self.encoder.block), range(torch.mlu.device_count()))
             if device_map is None
             else device_map
         )
@@ -1414,7 +1414,7 @@ class T5Model(T5PreTrainedModel):
         self.decoder = self.decoder.to("cpu")
         self.model_parallel = False
         self.device_map = None
-        torch.cuda.empty_cache()
+        torch.mlu.empty_cache()
 
     def get_input_embeddings(self):
         return self.shared
@@ -1513,7 +1513,7 @@ class T5Model(T5PreTrainedModel):
 
         # Set device for model parallelism
         if self.model_parallel:
-            torch.cuda.set_device(self.decoder.first_device)
+            torch.mlu.set_device(self.decoder.first_device)
             hidden_states = hidden_states.to(self.decoder.first_device)
             if decoder_input_ids is not None:
                 decoder_input_ids = decoder_input_ids.to(self.decoder.first_device)
@@ -1597,7 +1597,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
             FutureWarning,
         )
         self.device_map = (
-            get_device_map(len(self.encoder.block), range(torch.cuda.device_count()))
+            get_device_map(len(self.encoder.block), range(torch.mlu.device_count()))
             if device_map is None
             else device_map
         )
@@ -1620,7 +1620,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         self.lm_head = self.lm_head.to("cpu")
         self.model_parallel = False
         self.device_map = None
-        torch.cuda.empty_cache()
+        torch.mlu.empty_cache()
 
     def get_input_embeddings(self):
         return self.shared
@@ -1725,7 +1725,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
         hidden_states = encoder_outputs[0]
 
         if self.model_parallel:
-            torch.cuda.set_device(self.decoder.first_device)
+            torch.mlu.set_device(self.decoder.first_device)
 
         if labels is not None and decoder_input_ids is None and decoder_inputs_embeds is None:
             # get decoder inputs from shifting lm labels to the right
@@ -1733,7 +1733,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
 
         # Set device for model parallelism
         if self.model_parallel:
-            torch.cuda.set_device(self.decoder.first_device)
+            torch.mlu.set_device(self.decoder.first_device)
             hidden_states = hidden_states.to(self.decoder.first_device)
             if decoder_input_ids is not None:
                 decoder_input_ids = decoder_input_ids.to(self.decoder.first_device)
@@ -1762,7 +1762,7 @@ class T5ForConditionalGeneration(T5PreTrainedModel):
 
         # Set device for model parallelism
         if self.model_parallel:
-            torch.cuda.set_device(self.encoder.first_device)
+            torch.mlu.set_device(self.encoder.first_device)
             self.lm_head = self.lm_head.to(self.encoder.first_device)
             sequence_output = sequence_output.to(self.lm_head.weight.device)
 
@@ -1893,7 +1893,7 @@ class T5EncoderModel(T5PreTrainedModel):
             FutureWarning,
         )
         self.device_map = (
-            get_device_map(len(self.encoder.block), range(torch.cuda.device_count()))
+            get_device_map(len(self.encoder.block), range(torch.mlu.device_count()))
             if device_map is None
             else device_map
         )
@@ -1911,7 +1911,7 @@ class T5EncoderModel(T5PreTrainedModel):
         self.encoder = self.encoder.to("cpu")
         self.model_parallel = False
         self.device_map = None
-        torch.cuda.empty_cache()
+        torch.mlu.empty_cache()
 
     def get_input_embeddings(self):
         return self.shared

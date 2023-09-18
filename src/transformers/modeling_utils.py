@@ -2034,6 +2034,17 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
         else:
             return super().cuda(*args, **kwargs)
 
+    @wraps(torch.nn.Module.mlu)
+    def mlu(self, *args, **kwargs):
+        # Checks if the model has been loaded in 8-bit
+        if getattr(self, "quantization_method", None) == QuantizationMethod.BITS_AND_BYTES:
+            raise ValueError(
+                "Calling `mlu()` is not supported for `4-bit` or `8-bit` quantized models. Please use the model as it is, since the"
+                " model has already been set to the correct devices and casted to the correct `dtype`."
+            )
+        else:
+            return super().mlu(*args, **kwargs)
+
     @wraps(torch.nn.Module.to)
     def to(self, *args, **kwargs):
         # Checks if the model has been loaded in 8-bit
@@ -2489,13 +2500,13 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                 torch_dtype = torch.float16
 
             if device_map is None:
-                if torch.cuda.is_available():
-                    device_map = {"": torch.cuda.current_device()}
+                if torch.mlu.is_available():
+                    device_map = {"": torch.mlu.current_device()}
                 else:
-                    raise RuntimeError("No GPU found. A GPU is needed for quantization.")
+                    raise RuntimeError("No mlu found. A mlu is needed for quantization.")
                 logger.info(
                     "The device_map was not initialized."
-                    "Setting device_map to {'':torch.cuda.current_device()}."
+                    "Setting device_map to {'':torch.mlu.current_device()}."
                     "If you want to use the model for inference, please set device_map ='auto' "
                 )
                 if low_cpu_mem_usage is None:
@@ -2616,13 +2627,13 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                 if torch_dtype is None:
                     torch_dtype = torch.float16
                 if device_map is None:
-                    if torch.cuda.is_available():
-                        device_map = {"": torch.cuda.current_device()}
+                    if torch.mlu.is_available():
+                        device_map = {"": torch.mlu.current_device()}
                     else:
                         raise RuntimeError("No GPU found. A GPU is needed for quantization.")
                     logger.info(
                         "The device_map was not initialized."
-                        "Setting device_map to {'':torch.cuda.current_device()}."
+                        "Setting device_map to {'':torch.mlu.current_device()}."
                         "If you want to use the model for inference, please set device_map ='auto' "
                     )
                     if low_cpu_mem_usage is None:

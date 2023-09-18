@@ -1,4 +1,11 @@
-import importlib.metadata
+import importlib
+# The package importlib_metadata is in a different place, depending on the Python version.
+import sys
+if sys.version_info < (3, 8):
+    import importlib_metadata
+    importlib.metadata = importlib_metadata
+else:
+    import importlib.metadata as importlib_metadata
 import warnings
 from copy import deepcopy
 
@@ -69,7 +76,7 @@ def set_module_quantized_tensor_to_device(module, tensor_name, device, value=Non
 
     if is_8bit or is_4bit:
         param = module._parameters[tensor_name]
-        if param.device.type != "cuda":
+        if param.device.type != "mlu":
             if value is None:
                 new_value = old_value.to(device)
             elif isinstance(value, torch.Tensor):

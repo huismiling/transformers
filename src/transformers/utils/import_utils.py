@@ -546,7 +546,7 @@ def is_ipex_available():
     return True
 
 
-@lru_cache
+# @lru_cache
 def is_torch_xpu_available(check_device=False):
     "Checks if `intel_extension_for_pytorch` is installed and potentially if a XPU is in the environment"
     if not is_ipex_available():
