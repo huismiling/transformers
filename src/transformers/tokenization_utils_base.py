@@ -1787,7 +1787,7 @@ class PreTrainedTokenizerBase(SpecialTokensMixin, PushToHubMixin):
         else:
             return rendered
 
-    @lru_cache
+    # @lru_cache
     def _compile_jinja_template(self, chat_template):
         try:
             from jinja2.exceptions import TemplateError

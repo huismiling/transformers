@@ -74,7 +74,7 @@ def rot_vec_mul(r: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
     )
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
 def identity_rot_mats(
     batch_dims: Tuple[int, ...],
     dtype: Optional[torch.dtype] = None,
@@ -89,7 +89,7 @@ def identity_rot_mats(
     return rots
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
 def identity_trans(
     batch_dims: Tuple[int, ...],
     dtype: Optional[torch.dtype] = None,
@@ -100,7 +100,7 @@ def identity_trans(
     return trans
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
 def identity_quats(
     batch_dims: Tuple[int, ...],
     dtype: Optional[torch.dtype] = None,
@@ -219,7 +219,7 @@ _CACHED_QUATS: Dict[str, np.ndarray] = {
 }
 
 
-@lru_cache(maxsize=None)
+# @lru_cache(maxsize=None)
 def _get_quat(quat_key: str, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
     return torch.tensor(_CACHED_QUATS[quat_key], dtype=dtype, device=device)
 

@@ -574,7 +574,7 @@ class WhisperTokenizer(PreTrainedTokenizer):
 
         return offsets
 
-    @lru_cache
+    # @lru_cache
     def timestamp_ids(self, time_precision=0.02):
         """
         Compute the timestamp token ids for a given precision and save to least-recently used (LRU) cache.
