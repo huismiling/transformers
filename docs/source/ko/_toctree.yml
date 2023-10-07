@@ -117,8 +117,8 @@
       title: 성능 및 확장성
     - local: in_translation
       title: (번역중) Training on one GPU
-    - local: in_translation
-      title: (번역중) Training on many GPUs
+    - local: perf_train_gpu_many
+      title: 다중 GPU에서 훈련 진행하기
     - local: perf_train_cpu
       title: CPU에서 훈련
     - local: perf_train_cpu_many
@@ -141,8 +141,8 @@
       title: 훈련용 사용자 맞춤형 하드웨어
     - local: in_translation
       title: (번역중) Instantiating a big model
-    - local: in_translation
-      title: (번역중) Debugging
+    - local: debugging
+      title: 디버깅
     - local: hpo_train
       title: Trainer API를 사용한 하이퍼파라미터 탐색
     - local: tf_xla
@@ -174,8 +174,8 @@
     title: 🤗 Transformers로 작업을 해결하는 방법
   - local: model_summary
     title: Transformer 모델군
-  - local: in_translation
-    title: (번역중) Summary of the tokenizers
+  - local: tokenizer_summary
+    title: 토크나이저 요약
   - local: attention
     title: 어텐션 매커니즘
   - local: pad_truncation
