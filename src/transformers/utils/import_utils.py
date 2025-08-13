@@ -643,6 +643,8 @@ def is_torch_bf16_gpu_available() -> bool:
         return True
     if is_torch_npu_available():
         return torch.npu.is_bf16_supported()
+    if is_torch_mlu_available():
+        return torch.mlu.is_bf16_supported()
     return False
 
 
