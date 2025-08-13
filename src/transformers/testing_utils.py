@@ -913,6 +913,19 @@ def require_torch_multi_hpu(test_case):
     return unittest.skipUnless(torch.hpu.device_count() > 1, "test requires multiple HPUs")(test_case)
 
 
+def require_torch_multi_mlu(test_case):
+    """
+    Decorator marking a test that requires a multi-MLU setup (in PyTorch). These tests are skipped on a machine without
+    multiple MLUs.
+
+    To run *only* the multi_mlu tests, assuming all test names contain multi_mlu: $ pytest -sv ./tests -k "multi_mlu"
+    """
+    if not is_torch_mlu_available():
+        return unittest.skip(reason="test requires PyTorch MLU")(test_case)
+
+    return unittest.skipUnless(torch.mlu.device_count() > 1, "test requires multiple MLUs")(test_case)
+
+
 if is_torch_available():
     # Set env var CUDA_VISIBLE_DEVICES="" to force cpu-mode
     import torch

@@ -403,7 +403,10 @@ class CoreIntegrationDeepSpeed(TestCasePlus, TrainerIntegrationCommon):
             model.config.max_position_embeddings, model.config.rotary_dim
         )
         self.assertFalse(torch.allclose(good_deepspeed_sin_cos, bad_deepspeed_sin_cos))
-        torch.testing.assert_close(good_torch_sin_cos, good_deepspeed_sin_cos.cpu())
+        atol = 1e-8
+        if good_deepspeed_sin_cos.device.type in ["mlu"]:
+            atol = 1e-5
+        torch.testing.assert_close(good_torch_sin_cos, good_deepspeed_sin_cos.cpu(), atol=atol)
 
         # Finally, we can see that the incorrect pattern is okay on vanilla torch, demonstrating that this issue is
         # exclusive to DeepSpeed
